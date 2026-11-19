@@ -1,3 +1,4 @@
+!pip install simpy
 """
 Simulación de Eventos Discretos (Modelo G/G/c/K) de un Pool de Conexiones a Base de Datos — Versión 3
 Implementación gemela en Python + SimPy sincronizada con index.html (v3) para GitHub Pages.
