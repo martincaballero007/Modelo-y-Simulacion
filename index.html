@@ -1,0 +1,2238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simulador DES: Pool de Conexiones a Base de Datos (G/G/c/K)</title>
+  <style>
+    :root {
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #475569;
+      --light-muted: #64748b;
+      --border: #e2e8f0;
+      --primary: #1d4ed8;
+      --primary-hover: #1e40af;
+      --success: #15803d;
+      --success-bg: #dcfce7;
+      --warning: #b45309;
+      --warning-bg: #fef3c7;
+      --danger: #b91c1c;
+      --danger-bg: #fee2e2;
+      --info-bg: #eff6ff;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 18px;
+    }
+
+    .container {
+      max-width: 1360px;
+      margin: 0 auto;
+    }
+
+    /* HEADER */
+    header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #1d4ed8 100%);
+      color: #ffffff;
+      padding: 22px 26px;
+      border-radius: 14px;
+      margin-bottom: 16px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, 0.14);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+    }
+
+    header h1 {
+      font-size: 1.42rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    header p {
+      font-size: 0.88rem;
+      color: #cbd5e1;
+      margin-top: 3px;
+    }
+
+    .header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .badge-pill {
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    /* BUTTONS */
+    .btn {
+      border: none;
+      border-radius: 8px;
+      padding: 8px 13px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn:active { transform: translateY(1px); }
+
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+
+    .btn-success { background: #16a34a; color: #fff; }
+    .btn-success:hover { background: #15803d; }
+
+    .btn-dark { background: #0f172a; color: #fff; }
+    .btn-dark:hover { background: #1e293b; }
+
+    .btn-outline { background: #fff; color: var(--text); border: 1px solid var(--border); }
+    .btn-outline:hover { background: #f8fafc; }
+
+    .btn-scen {
+      background: #f8fafc;
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 7px 11px;
+      font-size: 0.8rem;
+    }
+    .btn-scen:hover { background: #e2e8f0; }
+    .btn-scen.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    /* PROCESS FLOW DIAGRAM */
+    .flow-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 16px;
+    }
+
+    .flow-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--light-muted);
+      letter-spacing: 0.04em;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .flow-diagram {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .flow-node {
+      flex: 1;
+      min-width: 150px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      text-align: center;
+    }
+
+    .flow-node strong {
+      display: block;
+      font-size: 0.84rem;
+      color: var(--text);
+    }
+
+    .flow-node span {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .flow-node.node-reject {
+      background: #fef2f2;
+      border-color: #fecaca;
+    }
+    .flow-node.node-reject strong { color: #991b1b; }
+
+    .flow-node.node-ok {
+      background: #f0fdf4;
+      border-color: #bbf7d0;
+    }
+    .flow-node.node-ok strong { color: #166534; }
+
+    .flow-arrow {
+      font-weight: 700;
+      color: var(--light-muted);
+      font-size: 1.1rem;
+    }
+
+    /* TOOLBAR SCENARIOS */
+    .toolbar {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .scen-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* MAIN WORKSPACE GRID */
+    .workspace {
+      display: grid;
+      grid-template-columns: 330px 1fr;
+      gap: 16px;
+      align-items: start;
+      margin-bottom: 18px;
+    }
+
+    @media (max-width: 1024px) {
+      .workspace { grid-template-columns: 1fr; }
+    }
+
+    .sidebar-panel, .card-panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 18px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+
+    .section-heading {
+      font-size: 0.94rem;
+      font-weight: 700;
+      color: var(--text);
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .control-group {
+      margin-bottom: 12px;
+      background: #f8fafc;
+      padding: 10px 12px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+    }
+
+    .control-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .val-badge {
+      background: var(--primary);
+      color: #fff;
+      font-family: monospace;
+      font-size: 0.8rem;
+      padding: 1px 7px;
+      border-radius: 5px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+
+    select, input[type="number"] {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #fff;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .hint-text {
+      font-size: 0.72rem;
+      color: var(--light-muted);
+      margin-top: 4px;
+    }
+
+    /* THEORY BOX IN SIDEBAR */
+    .theory-box {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 0.79rem;
+      color: #78350f;
+      margin-top: 12px;
+    }
+
+    .theory-box h4 {
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-bottom: 6px;
+      color: #92400e;
+    }
+
+    .theory-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 2px 0;
+      border-bottom: 1px dashed #fcd34d;
+    }
+    .theory-row:last-child { border-bottom: none; }
+
+    /* KPI GRID */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .kpi-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      padding: 13px 14px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .kpi-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: var(--primary);
+    }
+    .kpi-card.ok::before { background: #16a34a; }
+    .kpi-card.warn::before { background: #d97706; }
+    .kpi-card.crit::before { background: #dc2626; }
+
+    .kpi-title {
+      font-size: 0.73rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--light-muted);
+    }
+
+    .kpi-num {
+      font-size: 1.48rem;
+      font-weight: 800;
+      margin: 4px 0 2px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .kpi-detail {
+      font-size: 0.74rem;
+      color: var(--muted);
+    }
+
+    /* LITTLE LAW BANNER */
+    .little-bar {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+      padding: 9px 14px;
+      border-radius: 9px;
+      font-size: 0.82rem;
+      margin-bottom: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    /* LIVE STAGE + TERMINAL LOG */
+    .live-split {
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    @media (max-width: 900px) {
+      .live-split { grid-template-columns: 1fr; }
+    }
+
+    .live-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .live-subgrid {
+      display: grid;
+      grid-template-columns: 1fr 18px 1.15fr;
+      gap: 8px;
+      align-items: center;
+    }
+
+    @media (max-width: 640px) {
+      .live-subgrid { grid-template-columns: 1fr; }
+    }
+
+    .queue-well {
+      background: #fff;
+      border: 1px dashed #cbd5e1;
+      border-radius: 8px;
+      padding: 8px;
+      min-height: 115px;
+      display: flex;
+      flex-wrap: wrap;
+      align-content: flex-start;
+      gap: 5px;
+    }
+
+    .chip {
+      background: #d97706;
+      color: #fff;
+      font-family: monospace;
+      font-size: 0.71rem;
+      font-weight: 700;
+      padding: 3px 6px;
+      border-radius: 5px;
+    }
+    .chip.sla-risk { background: #dc2626; }
+
+    .pool-slots {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(115px, 1fr));
+      gap: 6px;
+    }
+
+    .slot-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 6px 8px;
+      font-size: 0.74rem;
+    }
+    .slot-card.busy {
+      background: #eff6ff;
+      border-color: #93c5fd;
+    }
+
+    .slot-head {
+      display: flex;
+      justify-content: space-between;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .bar-bg {
+      height: 5px;
+      background: #e2e8f0;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .bar-fg {
+      height: 100%;
+      background: var(--primary);
+      width: 0%;
+    }
+
+    .terminal-log {
+      background: #0f172a;
+      color: #38bdf8;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 0.75rem;
+      padding: 10px 12px;
+      border-radius: 10px;
+      height: 175px;
+      overflow-y: auto;
+      line-height: 1.45;
+    }
+    .terminal-log .log-warn { color: #fbbf24; }
+    .terminal-log .log-err { color: #f87171; }
+    .terminal-log .log-ok { color: #4ade80; }
+
+    canvas {
+      width: 100%;
+      height: 245px;
+      display: block;
+    }
+
+    .charts-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    @media (max-width: 900px) {
+      .charts-row { grid-template-columns: 1fr; }
+    }
+
+    /* TABLES */
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+    th, td {
+      padding: 9px 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      background: #f8fafc;
+      font-weight: 700;
+      color: var(--muted);
+      font-size: 0.74rem;
+      text-transform: uppercase;
+    }
+    tr:hover td { background: #f8fafc; }
+
+    .badge-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+    .tag-ok { background: var(--success-bg); color: var(--success); }
+    .tag-warn { background: var(--warning-bg); color: var(--warning); }
+    .tag-crit { background: var(--danger-bg); color: var(--danger); }
+
+    .notes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 14px;
+      margin-top: 12px;
+    }
+
+    .note-box {
+      background: #f8fafc;
+      border-left: 4px solid var(--primary);
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 0.84rem;
+    }
+    .note-box h4 { font-size: 0.9rem; margin-bottom: 4px; }
+
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 14px;
+      border-radius: 10px;
+      overflow-x: auto;
+      font-size: 0.78rem;
+      line-height: 1.45;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <header>
+    <div>
+      <h1>Simulador DES: Pool de Conexiones a Base de Datos (Modelo G/G/c/K)</h1>
+      <p>Modelado y Simulación · Análisis de Colas, Cuellos de Botella, Ley de Little, Erlang C e Intervalos de Confianza (IC 95 %)</p>
+    </div>
+    <div class="header-actions">
+      <span class="badge-pill" id="headerBadgeEstado">Estado: Estable</span>
+      <button class="btn btn-outline" onclick="descargarCSV('escenarios')">⬇ CSV Escenarios (IC 95%)</button>
+      <button class="btn btn-outline" onclick="descargarCSV('historial')">⬇ CSV Historial</button>
+      <button class="btn btn-outline" onclick="descargarCSV('log')">⬇ CSV Log Eventos</button>
+    </div>
+  </header>
+
+  <!-- MAPA DEL PROCESO -->
+  <div class="flow-card">
+    <div class="flow-title">
+      <span>Arquitectura del Proceso Simulado (Flujo de Eventos Discretos)</span>
+      <span>Disciplina: FIFO · Horizonte: T_sim (descartando 10 % inicial de calentamiento / warm-up)</span>
+    </div>
+    <div class="flow-diagram">
+      <div class="flow-node">
+        <strong>1. Generador de Peticiones</strong>
+        <span>Llegadas Poisson · Δt ~ Exp(λ)</span>
+      </div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-node">
+        <strong>2. Control de Admisión</strong>
+        <span>¿Consultas en cola &lt; K?</span>
+      </div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-node node-reject">
+        <strong>Si Cola Llena (Q ≥ K)</strong>
+        <span>Rechazo / Timeout (HTTP 503)</span>
+      </div>
+      <div class="flow-arrow">|</div>
+      <div class="flow-node">
+        <strong>3. Cola de Espera FIFO</strong>
+        <span>Capacidad máxima K peticiones</span>
+      </div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-node">
+        <strong>4. Pool de Conexiones (c)</strong>
+        <span>Ejecución SQL · S ~ Distribución</span>
+      </div>
+      <div class="flow-arrow">➔</div>
+      <div class="flow-node node-ok">
+        <strong>5. Respuesta SQL</strong>
+        <span>Evaluación SLA (W ≤ umbral)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- BARRA DE ESCENARIOS EXPERIMENTALES -->
+  <div class="toolbar">
+    <div class="scen-group">
+      <strong style="font-size:0.82rem; color:var(--muted); margin-right:4px;">Escenarios What-If:</strong>
+      <button class="btn btn-scen active" id="btnE0" onclick="cargarEscenario('E0', 60, 5, 50, 40)">E0: Base Estable (λ=60, c=5)</button>
+      <button class="btn btn-scen" id="btnE1" onclick="cargarEscenario('E1', 92, 5, 50, 40)">E1: Cuello Botella (λ=92, c=5)</button>
+      <button class="btn btn-scen" id="btnE2" onclick="cargarEscenario('E2', 115, 5, 50, 40)">E2: Estrés / Rechazos (λ=115, c=5)</button>
+      <button class="btn btn-scen" id="btnE3" onclick="cargarEscenario('E3', 92, 8, 50, 40)">E3: To-Be Óptimo (λ=92, c=8)</button>
+      <button class="btn btn-scen" id="btnE4" onclick="cargarEscenario('E4', 115, 9, 50, 40)">E4: To-Be Pico Extremo (λ=115, c=9)</button>
+    </div>
+    <div class="scen-group">
+      <button class="btn btn-primary" onclick="simularYRegistrar()">↻ Simular y Guardar en Historial</button>
+      <button class="btn btn-success" onclick="ejecutar30Replicas()">📊 Ejecutar 30 Réplicas (IC 95 %)</button>
+    </div>
+  </div>
+
+  <!-- WORKSPACE: CONTROLES + RESULTADOS -->
+  <div class="workspace">
+
+    <!-- PANEL IZQUIERDO DE PARÁMETROS -->
+    <aside class="sidebar-panel">
+      <div class="section-heading">
+        <span>Parámetros de Entrada</span>
+        <span style="font-size:0.74rem; color:var(--primary); font-family:monospace;">G/G/c/K</span>
+      </div>
+
+      <div class="control-group">
+        <div class="control-top">
+          <span>Tasa de llegada (λ)</span>
+          <span class="val-badge" id="lblLambda">60 req/s</span>
+        </div>
+        <input type="range" id="inLambda" min="10" max="160" step="2" value="60" oninput="onControlInput()" />
+        <div class="hint-text">Media entre llegadas: <strong id="hintInter">16.7 ms</strong> (Poisson)</div>
+      </div>
+
+      <div class="control-group">
+        <div class="control-top">
+          <span>Conexiones en el Pool (c)</span>
+          <span class="val-badge" id="lblPool">5 conx.</span>
+        </div>
+        <input type="range" id="inPool" min="1" max="15" step="1" value="5" oninput="onControlInput()" />
+        <div class="hint-text">Capacidad máxima (c·μ): <strong id="hintCap">100.0 req/s</strong></div>
+      </div>
+
+      <div class="control-group">
+        <div class="control-top">
+          <span>Servicio medio SQL E[S]</span>
+          <span class="val-badge" id="lblSrv">50 ms</span>
+        </div>
+        <input type="range" id="inSrv" min="15" max="120" step="5" value="50" oninput="onControlInput()" />
+        <div class="hint-text">Tasa por conexión (μ): <strong id="hintMu">20.0 req/s</strong></div>
+      </div>
+
+      <div class="control-group">
+        <div class="control-top">
+          <span>Distribución de servicio</span>
+          <span class="val-badge" id="lblDistBadge">CV = 0.8</span>
+        </div>
+        <select id="inDist" onchange="onControlInput()">
+          <option value="lognormal" selected>Lognormal (Cola pesada, CV = 0.8)</option>
+          <option value="normal">Normal truncada (CV = 0.25)</option>
+          <option value="exponencial">Exponencial (Validación M/M/c)</option>
+          <option value="uniforme">Uniforme [0.5·E[S], 1.5·E[S]]</option>
+        </select>
+        <div class="hint-text">Lognormal modela consultas rápidas + JOINs lentos</div>
+      </div>
+
+      <div class="control-group">
+        <div class="control-top">
+          <span>Capacidad de cola FIFO (K)</span>
+          <span class="val-badge" id="lblK">40</span>
+        </div>
+        <input type="range" id="inK" min="5" max="200" step="5" value="40" oninput="onControlInput()" />
+        <div class="hint-text">Si Q ≥ K, la petición se rechaza (HTTP 503)</div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <div class="control-group" style="margin-bottom:0;">
+          <div class="control-top"><span>Horizonte T_sim</span></div>
+          <select id="inHorizonte" onchange="onControlInput()">
+            <option value="30">30 s (Warmup 3s)</option>
+            <option value="60" selected>60 s (Warmup 6s)</option>
+            <option value="120">120 s (Warmup 12s)</option>
+          </select>
+        </div>
+        <div class="control-group" style="margin-bottom:0;">
+          <div class="control-top"><span>SLA (ms) / Semilla</span></div>
+          <div style="display:flex; gap:4px;">
+            <input type="number" id="inSla" value="150" min="30" max="1000" step="10" title="Umbral SLA en ms" onchange="onControlInput()" />
+            <input type="number" id="inSeed" value="42" min="1" max="99999" title="Semilla aleatoria" onchange="onControlInput()" />
+          </div>
+        </div>
+      </div>
+
+      <!-- PANEL ANALÍTICO EN VIVO (TEORÍA DE COLAS) -->
+      <div class="theory-box">
+        <h4>Referencia Analítica (Teoría de Colas)</h4>
+        <div class="theory-row">
+          <span>Carga ofrecida (a = λ·E[S]):</span>
+          <strong id="teoCarga">3.00</strong>
+        </div>
+        <div class="theory-row">
+          <span>Utilización teórica (ρ = a/c):</span>
+          <strong id="teoRho">60.0 %</strong>
+        </div>
+        <div class="theory-row">
+          <span>Wq teórico Erlang C (M/M/c):</span>
+          <strong id="teoWqErlang">0.00 ms</strong>
+        </div>
+        <div class="theory-row">
+          <span>P(Servicio &gt; SLA) intrínseca:</span>
+          <strong id="teoSlaBase">0.0 %</strong>
+        </div>
+        <div class="theory-row">
+          <span>Costo reserva (Conexión·s):</span>
+          <strong id="teoCostoConn">270.0 conx·s</strong>
+        </div>
+        <div style="margin-top:6px; font-size:0.72rem; color:#92400e;">
+          * Erlang C asume servicio exponencial y cola infinita (K=∞); sirve como cota de referencia para validar el motor.
+        </div>
+      </div>
+    </aside>
+
+    <!-- PANEL DERECHO: KPIS, MONITOR VIVO Y GRÁFICA DE COLA -->
+    <div>
+      <!-- 6 TARJETAS DE INDICADORES -->
+      <div class="kpi-grid">
+        <div class="kpi-card" id="cardWq">
+          <div class="kpi-title">1. Espera en Cola (Wq)</div>
+          <div class="kpi-num" id="valWq">0.00 ms</div>
+          <div class="kpi-detail">P95 cola: <strong id="valWqP95">0.0 ms</strong> · Máx: <strong id="valWqMax">0.0 ms</strong></div>
+        </div>
+
+        <div class="kpi-card" id="cardW">
+          <div class="kpi-title">2. Tiempo de Ciclo (W / CT)</div>
+          <div class="kpi-num" id="valW">0.00 ms</div>
+          <div class="kpi-detail">Latencia P95 total: <strong id="valWP95">0.0 ms</strong></div>
+        </div>
+
+        <div class="kpi-card" id="cardRho">
+          <div class="kpi-title">3. Utilización Pool (ρ)</div>
+          <div class="kpi-num" id="valRho">0.0 %</div>
+          <div class="kpi-detail">Throughput X: <strong id="valThru">0.0 req/s</strong></div>
+        </div>
+
+        <div class="kpi-card" id="cardLq">
+          <div class="kpi-title">4. Longitud Cola (Lq)</div>
+          <div class="kpi-num" id="valLq">0.000</div>
+          <div class="kpi-detail">Pico máximo en cola: <strong id="valLqMax">0</strong> / <span id="valKCap">40</span></div>
+        </div>
+
+        <div class="kpi-card" id="cardL">
+          <div class="kpi-title">5. En Sistema (L / WIP)</div>
+          <div class="kpi-num" id="valL">0.000</div>
+          <div class="kpi-detail">Atendidas: <strong id="valDone">0</strong> consultas</div>
+        </div>
+
+        <div class="kpi-card" id="cardSla">
+          <div class="kpi-title">6. Rechazos / Fuera SLA</div>
+          <div class="kpi-num" id="valRej">0.0 %</div>
+          <div class="kpi-detail">Fuera SLA (&gt;<span id="lblSlaCard">150</span>ms): <strong id="valOutSla">0.0 %</strong></div>
+        </div>
+      </div>
+
+      <!-- LEY DE LITTLE -->
+      <div class="little-bar">
+        <div>
+          <strong>Verificación Ley de Little (L = λ_ef · W):</strong>
+          <span id="littleText">L medido = 0.000 vs. (λ_ef × W) = 0.000</span>
+        </div>
+        <div id="littleDiff">Error relativo: 0.00 % (Estado estacionario consistente)</div>
+      </div>
+
+      <!-- MONITOR EN VIVO + TERMINAL DE LOG -->
+      <div class="card-panel" style="margin-bottom:14px;">
+        <div class="section-heading">
+          <span>Monitor Visual en Tiempo Real y Registro de Eventos (Log)</span>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <span style="font-size:0.78rem; color:var(--muted);">Reloj: <strong id="liveClock">0.00 s</strong></span>
+            <button class="btn btn-outline" style="padding:4px 9px; font-size:0.76rem;" id="btnPauseLive" onclick="toggleLive()">⏸ Pausar</button>
+          </div>
+        </div>
+
+        <div class="live-split">
+          <div class="live-box">
+            <div class="live-subgrid">
+              <div>
+                <div style="font-size:0.74rem; font-weight:700; color:var(--muted); margin-bottom:5px; display:flex; justify-content:space-between;">
+                  <span>COLA FIFO</span>
+                  <span id="liveQCount">0 / 40</span>
+                </div>
+                <div class="queue-well" id="liveQueueWell"></div>
+              </div>
+              <div style="text-align:center; font-weight:700; color:var(--light-muted);">➔</div>
+              <div>
+                <div style="font-size:0.74rem; font-weight:700; color:var(--muted); margin-bottom:5px; display:flex; justify-content:space-between;">
+                  <span>CONEXIONES POOL</span>
+                  <span id="liveSlotCount">0 / 5</span>
+                </div>
+                <div class="pool-slots" id="livePoolSlots"></div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div style="font-size:0.74rem; font-weight:700; color:var(--muted); margin-bottom:5px; display:flex; justify-content:space-between;">
+              <span>LOG DE EVENTOS EN VIVO (CASE ID / TIEMPOS)</span>
+              <span>Tiempo real</span>
+            </div>
+            <div class="terminal-log" id="terminalLog"></div>
+          </div>
+        </div>
+
+        <!-- GRÁFICO PRINCIPAL DE COLA Lq(t) CON EJE AUTOAJUSTABLE -->
+        <div style="margin-top:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; flex-wrap:wrap; gap:4px;">
+            <strong style="font-size:0.86rem;">Evolución Temporal de la Cola FIFO Lq(t) — Corrida Completa</strong>
+            <span style="font-size:0.75rem; color:var(--light-muted);">Área: longitud instantánea · Zona gris: Warm-up descartado · Línea negra: media estable Lq</span>
+          </div>
+          <canvas id="canvasCola"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FILA 1 DE GRÁFICOS ANALÍTICOS: SATURACIÓN + BARRAS ESCENARIOS -->
+  <div class="charts-row">
+    <div class="card-panel">
+      <div class="section-heading">
+        <span>Curva de Saturación: Espera (Wq) vs. Tráfico (λ)</span>
+        <span style="font-size:0.76rem; color:var(--muted);">Pool actual (c) vs. Ampliado (c + 3)</span>
+      </div>
+      <canvas id="canvasSaturacion"></canvas>
+      <p style="font-size:0.76rem; color:var(--muted); margin-top:6px;">
+        Muestra el crecimiento no lineal de Wq conforme λ se acerca al límite teórico de capacidad (c·μ).
+      </p>
+    </div>
+
+    <div class="card-panel">
+      <div class="section-heading">
+        <span>Comparativa de Latencia (W = Ts + Wq) por Escenario</span>
+        <span style="font-size:0.76rem; color:var(--muted);">Servicio SQL vs. Espera en Cola</span>
+      </div>
+      <canvas id="canvasBarras"></canvas>
+      <p style="font-size:0.76rem; color:var(--muted); margin-top:6px;">
+        Evidencia cómo en E1 y E2 el tiempo de espera en cola (naranja) supera al tiempo útil de ejecución SQL (azul).
+      </p>
+    </div>
+  </div>
+
+  <!-- FILA 2 DE GRÁFICOS ANALÍTICOS (NUEVOS EN V3): HISTOGRAMA W + CARGA POR CONEXIÓN -->
+  <div class="charts-row">
+    <div class="card-panel">
+      <div class="section-heading">
+        <span>Distribución del Tiempo de Ciclo W (Histograma + Umbral SLA)</span>
+        <span style="font-size:0.76rem; color:var(--muted);">Corrida actual (post warm-up)</span>
+      </div>
+      <canvas id="canvasHistograma"></canvas>
+      <p style="font-size:0.76rem; color:var(--muted); margin-top:6px;">
+        Barras verdes cumplen SLA (W ≤ umbral); barras rojas representan la cola pesada que excede el SLA.
+      </p>
+    </div>
+
+    <div class="card-panel">
+      <div class="section-heading">
+        <span>Consultas Atendidas y Utilización por Conexión Individual</span>
+        <span style="font-size:0.76rem; color:var(--muted);">Balance de carga Conn #1 .. Conn #c</span>
+      </div>
+      <canvas id="canvasConexiones"></canvas>
+      <p style="font-size:0.76rem; color:var(--muted); margin-top:6px;">
+        Al asignar la primera conexión libre disponible, se observa qué conexiones absorben carga base y cuáles absorben ráfagas pico.
+      </p>
+    </div>
+  </div>
+
+  <!-- TABLA DE HISTORIAL ACUMULATIVO DE CORRIDAS PERSONALIZADAS (NUEVO EN V3) -->
+  <div class="card-panel" style="margin-bottom:18px;">
+    <div class="section-heading">
+      <span>Historial de Corridas Personalizadas (Exploración Interactiva)</span>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-primary" style="padding:5px 11px; font-size:0.78rem;" onclick="registrarEnHistorial()">
+          + Guardar Corrida Actual
+        </button>
+        <button class="btn btn-outline" style="padding:5px 11px; font-size:0.78rem;" onclick="limpiarHistorial()">
+          🗑 Borrar Historial
+        </button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Etiqueta / Dist.</th>
+            <th>λ (req/s)</th>
+            <th>c (conx)</th>
+            <th>E[S] / K</th>
+            <th>Semilla</th>
+            <th>Wq (ms)</th>
+            <th>W / CT (ms)</th>
+            <th>P95 (ms)</th>
+            <th>ρ (%)</th>
+            <th>Lq / L</th>
+            <th>Rechazo / SLA</th>
+            <th>Costo (conx·s)</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyHistorial"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TABLA DE EXPERIMENTACIÓN (1 CORRIDA O 30 RÉPLICAS CON IC 95 %) -->
+  <div class="card-panel" style="margin-bottom:18px;">
+    <div class="section-heading">
+      <span id="tituloTablaExp">Resultados Comparativos de Escenarios (Corrida Base — Semilla 42)</span>
+      <button class="btn btn-success" style="padding:5px 11px; font-size:0.78rem;" onclick="ejecutar30Replicas()">
+        📊 Calcular 30 Réplicas con IC 95 % (t = 2.045)
+      </button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Escenario</th>
+            <th>Configuración</th>
+            <th>Wq Media (ms)</th>
+            <th>W / CT Media (ms)</th>
+            <th>Latencia P95 (ms)</th>
+            <th>Utilización ρ (%)</th>
+            <th>Cola Media Lq</th>
+            <th>Sistema L (WIP)</th>
+            <th>Throughput X</th>
+            <th>Rechazo 503</th>
+            <th>Fuera SLA</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyResultados"></tbody>
+      </table>
+    </div>
+    <div id="notaEstadistica" style="font-size:0.78rem; color:var(--muted); margin-top:8px;">
+      Mostrando resultados de 1 corrida determinista (semilla = 42). Pulsa <strong>«Calcular 30 Réplicas con IC 95 %»</strong> para obtener estimaciones con intervalos de confianza de Student (29 g.l.).
+    </div>
+  </div>
+
+  <!-- LOG DETALLADO + SUSTENTO Y CÓDIGO SIMPY -->
+  <div class="card-panel">
+    <div class="section-heading">
+      <span>Muestra de Trazas del Simulador (Log) y Documentación del Modelo</span>
+    </div>
+
+    <div class="table-wrap" style="margin-bottom:16px;">
+      <table>
+        <thead>
+          <tr>
+            <th>Case ID</th>
+            <th>Conexión</th>
+            <th>Instante Llegada</th>
+            <th>Inicio Servicio</th>
+            <th>Fin Consulta</th>
+            <th>Espera Cola (Wq)</th>
+            <th>Tiempo Ciclo (W)</th>
+            <th>Estado SLA</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyLogMuestra"></tbody>
+      </table>
+    </div>
+
+    <div class="notes-grid">
+      <div class="note-box">
+        <h4>1. Justificación de Distribuciones (G/G/c/K)</h4>
+        <p>Los arribos de consultas backend son independientes y se modelan con un <strong>proceso de Poisson</strong> (tiempos entre llegadas exponenciales de media 1/λ). La duración SQL sigue por defecto una <strong>Lognormal</strong> (cola pesada: consultas indexadas rápidas y <em>JOINs</em> complejos ocasionales), con cola finita <em>K</em> que modela el <em>connection timeout</em>.</p>
+      </div>
+      <div class="note-box" style="border-left-color:#dc2626;">
+        <h4>2. Análisis del Cuello de Botella (As-Is)</h4>
+        <p>Con <em>c = 5</em> conexiones y servicio medio de 50 ms (μ = 20 req/s por conexión), la capacidad máxima es 100 req/s. Al subir el tráfico a 92 req/s (E1) o 115 req/s (E2), ρ supera el 90 %, disparando <em>Wq</em> de forma no lineal, saturando el búfer <em>K = 40</em> y generando rechazos HTTP 503.</p>
+      </div>
+      <div class="note-box" style="border-left-color:#16a34a;">
+        <h4>3. Recomendación de Rediseño (To-Be)</h4>
+        <p>Escalar el pool de <strong>5 a 8 conexiones</strong> (E3) absorbe 92 req/s con utilización segura (~58 %), cero rechazos y cumplimiento de SLA superior al 94 %, sin sobredimensionar memoria en el motor de base de datos.</p>
+      </div>
+    </div>
+
+    <details style="margin-top:14px;">
+      <summary style="cursor:pointer; font-weight:700; font-size:0.86rem; color:var(--primary);">
+        Ver código gemelo en Python (SimPy) para validación cruzada
+      </summary>
+      <pre>import math, random, statistics, simpy
+
+def correr_replica_simpy(lam, c, media_s=0.05, dist="lognormal", k_max=40, t_sim=60.0, warmup=6.0, seed=42):
+    rng = random.Random(seed)
+    env = simpy.Environment()
+    pool = simpy.Resource(env, capacity=c)
+    t_prev, en_cola, en_srv = 0.0, 0, 0
+    area_q, area_s = 0.0, 0.0
+    wq_list, w_list = [], []
+    llegadas, rechazos = 0, 0
+
+    def acumular():
+        nonlocal t_prev, area_q, area_s
+        ahora = env.now
+        ini = max(t_prev, warmup)
+        if ahora > ini:
+            dt = ahora - ini
+            area_q += en_cola * dt
+            area_s += en_srv * dt
+        t_prev = ahora
+
+    def gen_servicio():
+        if dist == "exponencial": return rng.expovariate(1.0 / media_s)
+        if dist == "normal": return max(0.005, rng.gauss(media_s, media_s * 0.25))
+        if dist == "uniforme": return rng.uniform(0.5 * media_s, 1.5 * media_s)
+        sigma_ln = math.sqrt(math.log(1 + 0.8**2))
+        mu_ln = math.log(media_s) - 0.5 * sigma_ln**2
+        return rng.lognormvariate(mu_ln, sigma_ln)
+
+    def peticion():
+        nonlocal en_cola, en_srv, llegadas, rechazos
+        t_ll = env.now
+        medida = t_ll >= warmup
+        if medida: llegadas += 1
+        if en_cola >= k_max:
+            if medida: rechazos += 1
+            return
+        acumular(); en_cola += 1
+        with pool.request() as req:
+            yield req
+            t_ini = env.now
+            acumular(); en_cola -= 1; en_srv += 1
+            yield env.timeout(gen_servicio())
+            acumular(); en_srv -= 1
+            if medida:
+                wq_list.append(t_ini - t_ll)
+                w_list.append(env.now - t_ll)
+
+    def generador():
+        while True:
+            yield env.timeout(rng.expovariate(lam))
+            env.process(peticion())
+
+    env.process(generador())
+    env.run(until=t_sim)
+    acumular()
+    t_med = t_sim - warmup
+    return {
+        "Wq_ms": statistics.mean(wq_list) * 1000,
+        "W_ms": statistics.mean(w_list) * 1000,
+        "rho": (area_s / (c * t_med)) * 100,
+        "Lq": area_q / t_med,
+        "L": (area_q + area_s) / t_med,
+        "rechazo_pct": 100 * rechazos / max(1, llegadas)
+    }</pre>
+    </details>
+  </div>
+
+</div>
+
+<script>
+  // =========================================================================
+  // 1. GENERADOR PSEUDOALEATORIO DETERMINISTA (MULBERRY32)
+  // =========================================================================
+  function crearRNG(seed) {
+    let a = (seed >>> 0) || 1;
+    return function() {
+      let t = a += 0x6D2B79F5;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function genExp(rng, rate) {
+    const u = Math.max(1e-12, 1.0 - rng());
+    return -Math.log(u) / rate;
+  }
+
+  function genNormalStd(rng) {
+    const u1 = Math.max(1e-12, rng());
+    const u2 = rng();
+    return Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+  }
+
+  function genServicio(rng, mediaSeg, dist) {
+    if (dist === "exponencial") {
+      return genExp(rng, 1.0 / mediaSeg);
+    }
+    if (dist === "normal") {
+      return Math.max(0.005, mediaSeg + genNormalStd(rng) * (mediaSeg * 0.25));
+    }
+    if (dist === "uniforme") {
+      return mediaSeg * (0.5 + rng());
+    }
+    // Lognormal con CV = 0.8 (cola pesada realista)
+    const cv = 0.8;
+    const sigma2 = Math.log(1.0 + cv * cv);
+    const sigma = Math.sqrt(sigma2);
+    const mu = Math.log(mediaSeg) - 0.5 * sigma2;
+    return Math.exp(mu + sigma * genNormalStd(rng));
+  }
+
+  function percentil(arr, p) {
+    if (!arr || arr.length === 0) return 0;
+    const xs = [...arr].sort((a, b) => a - b);
+    const k = (xs.length - 1) * (p / 100.0);
+    const f = Math.floor(k);
+    const c = Math.min(f + 1, xs.length - 1);
+    return xs[f] + (xs[c] - xs[f]) * (k - f);
+  }
+
+  // =========================================================================
+  // 2. FÓRMULAS ANALÍTICAS ERLANG C Y PROBABILIDAD INTRÍNSECA DE SLA
+  // =========================================================================
+  function calcularErlangC(lambda, mediaMs, c) {
+    const mu = 1000.0 / mediaMs;
+    const a = lambda / mu;
+    const rho = a / c;
+    if (rho >= 0.999) return { a, rho, wqMs: Infinity };
+
+    let suma = 0.0;
+    let term = 1.0;
+    for (let k = 0; k < c; k++) {
+      if (k > 0) term *= a / k;
+      suma += term;
+    }
+    const ultimo = (term * (a / c)) / (1.0 - rho);
+    const pEspera = ultimo / (suma + ultimo);
+    const wqSeg = pEspera / (c * mu - lambda);
+    return { a, rho, wqMs: wqSeg * 1000.0 };
+  }
+
+  function probSlaIntrinseca(mediaMs, slaMs, dist) {
+    if (dist === "exponencial") {
+      return Math.exp(-slaMs / mediaMs) * 100.0;
+    }
+    if (dist === "uniforme") {
+      const minV = 0.5 * mediaMs, maxV = 1.5 * mediaMs;
+      if (slaMs <= minV) return 100.0;
+      if (slaMs >= maxV) return 0.0;
+      return ((maxV - slaMs) / (maxV - minV)) * 100.0;
+    }
+    const erf = x => {
+      const sign = x >= 0 ? 1 : -1;
+      x = Math.abs(x);
+      const t = 1 / (1 + 0.3275911 * x);
+      const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+      return 0.5 * (1 + sign * y);
+    };
+    if (dist === "normal") {
+      const z = (slaMs - mediaMs) / (mediaMs * 0.25);
+      return (1.0 - erf(z / Math.SQRT2)) * 100.0;
+    }
+    const sigma2 = Math.log(1.64);
+    const sigma = Math.sqrt(sigma2);
+    const mu = Math.log(mediaMs) - 0.5 * sigma2;
+    const z = (Math.log(slaMs) - mu) / sigma;
+    return (1.0 - erf(z / Math.SQRT2)) * 100.0;
+  }
+
+  // =========================================================================
+  // 3. MOTOR DE SIMULACIÓN DE EVENTOS DISCRETOS (G/G/c/K CON TRACKING POR CONEXIÓN)
+  // =========================================================================
+  function simularCorrida(params) {
+    const { lambda, c, mediaMs, dist, kMax, tSim, slaMs, seed } = params;
+    const warmup = tSim * 0.10;
+    const rngArr = crearRNG(seed);
+    const rngSrv = crearRNG(seed + 104729);
+    const mediaSeg = mediaMs / 1000.0;
+
+    let clock = 0.0;
+    const slotLibre = Array(c).fill(true);
+    const slotBusyTime = Array(c).fill(0.0);
+    const slotServedCount = Array(c).fill(0);
+    let busy = 0;
+
+    const queue = []; // { id, arrival }
+    const events = [];
+
+    function pushEv(ev) {
+      events.push(ev);
+      events.sort((a, b) => a.time - b.time);
+    }
+
+    function adquirirSlot() {
+      for (let i = 0; i < c; i++) {
+        if (slotLibre[i]) {
+          slotLibre[i] = false;
+          busy++;
+          return i;
+        }
+      }
+      return -1;
+    }
+
+    let seq = 1;
+    let tPrev = 0.0;
+    let areaCola = 0.0;
+    let areaServ = 0.0;
+    let lqMax = 0;
+
+    let llegadasMed = 0;
+    let rechazosMed = 0;
+    const wqList = [];
+    const wList = [];
+    const tsList = [];
+    const logMuestra = [];
+
+    const serieT = [0.0];
+    const serieQ = [0];
+
+    function acumular(nuevoT) {
+      const ini = Math.max(tPrev, warmup);
+      if (nuevoT > ini) {
+        const dt = nuevoT - ini;
+        areaCola += queue.length * dt;
+        areaServ += busy * dt;
+      }
+      tPrev = nuevoT;
+    }
+
+    function registrarPunto(t, qLen) {
+      if (serieT[serieT.length - 1] === t) {
+        serieQ[serieQ.length - 1] = qLen;
+      } else {
+        serieT.push(t);
+        serieQ.push(qLen);
+      }
+    }
+
+    pushEv({ time: genExp(rngArr, lambda), type: "ARR", id: seq++ });
+
+    while (events.length > 0) {
+      const ev = events.shift();
+      if (ev.time > tSim) {
+        acumular(tSim);
+        registrarPunto(tSim, queue.length);
+        // Cerrar el tiempo ocupado de las conexiones aún en servicio al final del horizonte
+        [ev, ...events].forEach(e => {
+          if (e.type === "DEP") {
+            const ie = Math.max(e.ini, warmup);
+            if (tSim > ie) slotBusyTime[e.slot] += (tSim - ie);
+          }
+        });
+        break;
+      }
+      acumular(ev.time);
+      clock = ev.time;
+
+      if (ev.type === "ARR") {
+        pushEv({ time: clock + genExp(rngArr, lambda), type: "ARR", id: seq++ });
+        const enVentana = clock >= warmup;
+        if (enVentana) llegadasMed++;
+
+        if (queue.length >= kMax) {
+          if (enVentana) rechazosMed++;
+        } else if (busy < c) {
+          const sIdx = adquirirSlot();
+          const dur = genServicio(rngSrv, mediaSeg, dist);
+          pushEv({ time: clock + dur, type: "DEP", id: ev.id, arr: clock, ini: clock, dur, slot: sIdx });
+        } else {
+          queue.push({ id: ev.id, arrival: clock });
+          if (enVentana && queue.length > lqMax) lqMax = queue.length;
+        }
+        registrarPunto(clock, queue.length);
+
+      } else if (ev.type === "DEP") {
+        // Contabilizar trabajo útil de la conexión en ventana estable
+        const inicioEfectivo = Math.max(ev.ini, warmup);
+        if (clock > inicioEfectivo) {
+          slotBusyTime[ev.slot] += (clock - inicioEfectivo);
+        }
+        if (ev.arr >= warmup) {
+          slotServedCount[ev.slot]++;
+          const wq = (ev.ini - ev.arr) * 1000.0;
+          const w = (clock - ev.arr) * 1000.0;
+          wqList.push(wq);
+          wList.push(w);
+          tsList.push(ev.dur * 1000.0);
+
+          if (logMuestra.length < 7) {
+            logMuestra.push({
+              caseId: `REQ-${String(ev.id).padStart(4, "0")}`,
+              conn: `Conn #${ev.slot + 1}`,
+              llegada: ev.arr,
+              inicio: ev.ini,
+              fin: clock,
+              wqMs: wq,
+              wMs: w,
+              okSla: w <= slaMs
+            });
+          }
+        }
+
+        if (queue.length > 0) {
+          const nxt = queue.shift();
+          const dur = genServicio(rngSrv, mediaSeg, dist);
+          pushEv({ time: clock + dur, type: "DEP", id: nxt.id, arr: nxt.arrival, ini: clock, dur, slot: ev.slot });
+        } else {
+          slotLibre[ev.slot] = true;
+          busy--;
+        }
+        registrarPunto(clock, queue.length);
+      }
+    }
+
+    const tMed = tSim - warmup;
+    const mean = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+
+    const Wq = mean(wqList);
+    const W = mean(wList);
+    const Ts = mean(tsList);
+    const WqP95 = percentil(wqList, 95);
+    const WqMax = wqList.length ? Math.max(...wqList) : 0;
+    const WP95 = percentil(wList, 95);
+    const rho = (areaServ / (c * tMed)) * 100.0;
+    const Lq = areaCola / tMed;
+    const L = (areaCola + areaServ) / tMed;
+    const throughput = wList.length / tMed;
+    const admitidas = Math.max(0, llegadasMed - rechazosMed);
+    const lamEf = admitidas / tMed;
+    const L_little = lamEf * (W / 1000.0);
+    const rechazoPct = llegadasMed > 0 ? (rechazosMed / llegadasMed) * 100.0 : 0;
+    const fueraSlaPct = wList.length > 0 ? (wList.filter(x => x > slaMs).length / wList.length) * 100.0 : 0;
+    const costoConnSeg = c * tMed;
+
+    const perConn = Array.from({ length: c }, (_, i) => ({
+      label: `Conn #${i + 1}`,
+      served: slotServedCount[i],
+      utilPct: Math.min(100, (slotBusyTime[i] / tMed) * 100.0)
+    }));
+
+    return {
+      Wq, WqP95, WqMax, W, Ts, WP95, rho, Lq, LqMax: lqMax, L,
+      L_little, throughput, atendidas: wList.length,
+      rechazoPct, fueraSlaPct, costoConnSeg, warmup,
+      serieT, serieQ, wList, wqList, perConn, logMuestra
+    };
+  }
+
+  // =========================================================================
+  // 4. GRÁFICOS DINÁMICOS EN CANVAS (CON AUTOESCALADO INTELIGENTE)
+  // =========================================================================
+  function initCanvas(id) {
+    const canvas = document.getElementById(id);
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+    return { ctx, w: rect.width, h: rect.height };
+  }
+
+  function renderGraficoCola(res, kMax) {
+    const { ctx, w, h } = initCanvas("canvasCola");
+    const pad = { top: 18, right: 18, bottom: 30, left: 44 };
+    const pw = w - pad.left - pad.right;
+    const ph = h - pad.top - pad.bottom;
+    ctx.clearRect(0, 0, w, h);
+
+    const tMax = res.serieT[res.serieT.length - 1] || 1;
+    const maxObserved = Math.max(...res.serieQ);
+    const yMax = Math.max(4, Math.ceil(maxObserved * 1.2));
+
+    const xOf = t => pad.left + (t / tMax) * pw;
+    const yOf = q => pad.top + ph - (q / yMax) * ph;
+
+    // Franja Warm-up
+    ctx.fillStyle = "rgba(148, 163, 184, 0.18)";
+    ctx.fillRect(pad.left, pad.top, xOf(res.warmup) - pad.left, ph);
+    ctx.fillStyle = "#64748b";
+    ctx.font = "11px sans-serif";
+    ctx.fillText("Warm-up (10%)", pad.left + 6, pad.top + 13);
+
+    // Rejilla
+    ctx.strokeStyle = "#e2e8f0";
+    ctx.fillStyle = "#64748b";
+    ctx.textAlign = "right";
+    for (let i = 0; i <= 4; i++) {
+      const val = (yMax * i) / 4;
+      const y = yOf(val);
+      ctx.beginPath();
+      ctx.moveTo(pad.left, y);
+      ctx.lineTo(w - pad.right, y);
+      ctx.stroke();
+      ctx.fillText(val.toFixed(0), pad.left - 6, y + 4);
+    }
+
+    ctx.textAlign = "center";
+    for (let i = 0; i <= 6; i++) {
+      const tv = (tMax * i) / 6;
+      ctx.fillText(tv.toFixed(0) + "s", xOf(tv), h - 8);
+    }
+
+    if (kMax <= yMax) {
+      const yK = yOf(kMax);
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = "#dc2626";
+      ctx.beginPath();
+      ctx.moveTo(pad.left, yK);
+      ctx.lineTo(w - pad.right, yK);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    const step = Math.max(1, Math.floor(res.serieT.length / 1000));
+    const isCrit = res.rho > 88 || res.rechazoPct > 1;
+
+    ctx.beginPath();
+    ctx.moveTo(xOf(res.serieT[0]), yOf(0));
+    for (let i = 0; i < res.serieT.length; i += step) {
+      ctx.lineTo(xOf(res.serieT[i]), yOf(res.serieQ[i]));
+    }
+    ctx.lineTo(xOf(res.serieT[res.serieT.length - 1]), yOf(0));
+    ctx.closePath();
+    ctx.fillStyle = isCrit ? "rgba(220, 38, 38, 0.22)" : "rgba(29, 78, 216, 0.20)";
+    ctx.fill();
+
+    ctx.beginPath();
+    for (let i = 0; i < res.serieT.length; i += step) {
+      const x = xOf(res.serieT[i]), y = yOf(res.serieQ[i]);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = isCrit ? "#dc2626" : "#1d4ed8";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    const yLq = yOf(res.Lq);
+    ctx.save();
+    ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = "#0f172a";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, yLq);
+    ctx.lineTo(w - pad.right, yLq);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = "#0f172a";
+    ctx.font = "bold 11px sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(`Lq medio = ${res.Lq.toFixed(2)}`, w - pad.right - 6, Math.max(pad.top + 13, yLq - 5));
+  }
+
+  function renderGraficoSaturacion(params) {
+    const { ctx, w, h } = initCanvas("canvasSaturacion");
+    const pad = { top: 24, right: 18, bottom: 32, left: 50 };
+    const pw = w - pad.left - pad.right;
+    const ph = h - pad.top - pad.bottom;
+    ctx.clearRect(0, 0, w, h);
+
+    const mu = 1000.0 / params.mediaMs;
+    const c1 = params.c;
+    const c2 = params.c + 3;
+    const maxL = Math.max(params.lambda * 1.15, c1 * mu * 1.05);
+
+    const pts1 = [], pts2 = [];
+    for (let i = 1; i <= 10; i++) {
+      const l = (maxL * i) / 10;
+      const r1 = simularCorrida({ ...params, lambda: l, c: c1, tSim: 25, seed: 42 });
+      const r2 = simularCorrida({ ...params, lambda: l, c: c2, tSim: 25, seed: 42 });
+      pts1.push({ l, wq: r1.Wq });
+      pts2.push({ l, wq: r2.Wq });
+    }
+
+    const maxWq = Math.max(40, ...pts1.map(p => p.wq), ...pts2.map(p => p.wq)) * 1.12;
+    const xOf = l => pad.left + (l / maxL) * pw;
+    const yOf = q => pad.top + ph - (q / maxWq) * ph;
+
+    ctx.strokeStyle = "#e2e8f0";
+    ctx.fillStyle = "#64748b";
+    ctx.font = "11px sans-serif";
+    ctx.textAlign = "right";
+    for (let i = 0; i <= 4; i++) {
+      const v = (maxWq * i) / 4;
+      const y = yOf(v);
+      ctx.beginPath();
+      ctx.moveTo(pad.left, y);
+      ctx.lineTo(w - pad.right, y);
+      ctx.stroke();
+      ctx.fillText(v.toFixed(0) + "ms", pad.left - 6, y + 4);
+    }
+
+    ctx.textAlign = "center";
+    for (let i = 0; i <= 4; i++) {
+      const lv = (maxL * i) / 4;
+      ctx.fillText(lv.toFixed(0) + " req/s", xOf(lv), h - 9);
+    }
+
+    function drawLine(pts, color) {
+      ctx.beginPath();
+      pts.forEach((p, idx) => {
+        if (idx === 0) ctx.moveTo(xOf(p.l), yOf(p.wq));
+        else ctx.lineTo(xOf(p.l), yOf(p.wq));
+      });
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.3;
+      ctx.stroke();
+      pts.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(xOf(p.l), yOf(p.wq), 3.3, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+      });
+    }
+
+    drawLine(pts1, "#dc2626");
+    drawLine(pts2, "#16a34a");
+
+    ctx.font = "bold 11px sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#dc2626";
+    ctx.fillText(`● Pool actual c=${c1} (Cap. máx ${(c1 * mu).toFixed(0)} req/s)`, pad.left + 8, pad.top + 12);
+    ctx.fillStyle = "#16a34a";
+    ctx.fillText(`● Pool ampliado c=${c2} (Cap. máx ${(c2 * mu).toFixed(0)} req/s)`, pad.left + 8, pad.top + 27);
+  }
+
+  function renderGraficoBarras(listaEsc) {
+    const { ctx, w, h } = initCanvas("canvasBarras");
+    const pad = { top: 26, right: 16, bottom: 32, left: 50 };
+    const pw = w - pad.left - pad.right;
+    const ph = h - pad.top - pad.bottom;
+    ctx.clearRect(0, 0, w, h);
+
+    const maxW = Math.max(80, ...listaEsc.map(e => e.res.W)) * 1.18;
+    const yOf = v => pad.top + ph - (v / maxW) * ph;
+
+    ctx.strokeStyle = "#e2e8f0";
+    ctx.fillStyle = "#64748b";
+    ctx.font = "11px sans-serif";
+    ctx.textAlign = "right";
+    for (let i = 0; i <= 4; i++) {
+      const v = (maxW * i) / 4;
+      const y = yOf(v);
+      ctx.beginPath();
+      ctx.moveTo(pad.left, y);
+      ctx.lineTo(w - pad.right, y);
+      ctx.stroke();
+      ctx.fillText(v.toFixed(0) + "ms", pad.left - 6, y + 4);
+    }
+
+    const n = listaEsc.length;
+    const barW = Math.min(48, (pw / n) * 0.55);
+
+    listaEsc.forEach((item, idx) => {
+      const cx = pad.left + (pw * (idx + 0.5)) / n;
+      const x = cx - barW / 2;
+      const r = item.res;
+
+      const yTs = yOf(r.Ts);
+      const hTs = yOf(0) - yTs;
+      const yW = yOf(r.W);
+      const hWq = Math.max(0, yTs - yW);
+
+      ctx.fillStyle = "#2563eb";
+      ctx.fillRect(x, yTs, barW, hTs);
+
+      ctx.fillStyle = "#f59e0b";
+      ctx.fillRect(x, yW, barW, hWq);
+
+      ctx.fillStyle = "#0f172a";
+      ctx.font = "bold 10px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(`${r.W.toFixed(0)}ms`, cx, yW - 4);
+
+      ctx.fillStyle = "#475569";
+      ctx.font = "bold 11px sans-serif";
+      ctx.fillText(item.corto, cx, h - 9);
+    });
+
+    ctx.font = "11px sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#2563eb";
+    ctx.fillRect(pad.left + 8, 6, 10, 10);
+    ctx.fillStyle = "#334155";
+    ctx.fillText("Servicio SQL (Ts)", pad.left + 22, 15);
+
+    ctx.fillStyle = "#f59e0b";
+    ctx.fillRect(pad.left + 130, 6, 10, 10);
+    ctx.fillStyle = "#334155";
+    ctx.fillText("Espera Cola (Wq)", pad.left + 144, 15);
+  }
+
+  // --- NUEVO GRÁFICO V3 (1): HISTOGRAMA DE TIEMPO DE CICLO W + LÍNEA SLA ---
+  function renderHistograma(res, slaMs) {
+    const { ctx, w, h } = initCanvas("canvasHistograma");
+    const pad = { top: 24, right: 18, bottom: 34, left: 48 };
+    const pw = w - pad.left - pad.right;
+    const ph = h - pad.top - pad.bottom;
+    ctx.clearRect(0, 0, w, h);
+
+    if (!res.wList || res.wList.length === 0) return;
+
+    const p99 = percentil(res.wList, 99);
+    const maxBinVal = Math.max(slaMs * 1.4, p99 * 1.05, 80);
+    const numBins = 20;
+    const binW = maxBinVal / numBins;
+    const counts = Array(numBins).fill(0);
+
+    res.wList.forEach(val => {
+      const idx = Math.min(numBins - 1, Math.floor(val / binW));
+      counts[idx]++;
+    });
+
+    const maxCnt = Math.max(1, ...counts) * 1.15;
+    const yOf = c => pad.top + ph - (c / maxCnt) * ph;
+    const xOf = v => pad.left + (Math.min(v, maxBinVal) / maxBinVal) * pw;
+
+    // Rejilla
+    ctx.strokeStyle = "#e2e8f0";
+    ctx.fillStyle = "#64748b";
+    ctx.font = "11px sans-serif";
+    ctx.textAlign = "right";
+    for (let i = 0; i <= 4; i++) {
+      const v = (maxCnt * i) / 4;
+      const y = yOf(v);
+      ctx.beginPath();
+      ctx.moveTo(pad.left, y);
+      ctx.lineTo(w - pad.right, y);
+      ctx.stroke();
+      ctx.fillText(v.toFixed(0), pad.left - 6, y + 4);
+    }
+
+    const slotPx = pw / numBins;
+    counts.forEach((cnt, i) => {
+      const midVal = (i + 0.5) * binW;
+      const x = pad.left + i * slotPx + 1;
+      const y = yOf(cnt);
+      const barH = yOf(0) - y;
+      ctx.fillStyle = midVal <= slaMs ? "#16a34a" : "#dc2626";
+      ctx.fillRect(x, y, Math.max(2, slotPx - 2), barH);
+    });
+
+    // Etiquetas eje X
+    ctx.fillStyle = "#64748b";
+    ctx.textAlign = "center";
+    for (let i = 0; i <= 5; i++) {
+      const val = (maxBinVal * i) / 5;
+      ctx.fillText(val.toFixed(0) + "ms", xOf(val), h - 9);
+    }
+
+    // Línea vertical SLA
+    if (slaMs <= maxBinVal) {
+      const xSla = xOf(slaMs);
+      ctx.save();
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = "#0f172a";
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(xSla, pad.top);
+      ctx.lineTo(xSla, pad.top + ph);
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.fillStyle = "#0f172a";
+      ctx.font = "bold 11px sans-serif";
+      ctx.textAlign = xSla > w - 95 ? "right" : "left";
+      ctx.fillText(`SLA = ${slaMs} ms`, xSla + (xSla > w - 95 ? -5 : 5), pad.top + 13);
+    }
+  }
+
+  // --- NUEVO GRÁFICO V3 (2): UTILIZACIÓN Y ATENDIDAS POR CONEXIÓN INDIVIDUAL ---
+  function renderGraficoConexiones(res) {
+    const { ctx, w, h } = initCanvas("canvasConexiones");
+    const pad = { top: 26, right: 18, bottom: 34, left: 48 };
+    const pw = w - pad.left - pad.right;
+    const ph = h - pad.top - pad.bottom;
+    ctx.clearRect(0, 0, w, h);
+
+    const list = res.perConn || [];
+    if (list.length === 0) return;
+
+    const yOf = pct => pad.top + ph - (pct / 100.0) * ph;
+
+    // Rejilla
+    ctx.strokeStyle = "#e2e8f0";
+    ctx.fillStyle = "#64748b";
+    ctx.font = "11px sans-serif";
+    ctx.textAlign = "right";
+    for (let i = 0; i <= 4; i++) {
+      const pct = i * 25;
+      const y = yOf(pct);
+      ctx.beginPath();
+      ctx.moveTo(pad.left, y);
+      ctx.lineTo(w - pad.right, y);
+      ctx.stroke();
+      ctx.fillText(pct + "%", pad.left - 6, y + 4);
+    }
+
+    const n = list.length;
+    const barW = Math.min(44, (pw / n) * 0.58);
+
+    list.forEach((item, idx) => {
+      const cx = pad.left + (pw * (idx + 0.5)) / n;
+      const x = cx - barW / 2;
+      const y = yOf(item.utilPct);
+      const barH = yOf(0) - y;
+
+      ctx.fillStyle = item.utilPct > 85 ? "#dc2626" : (item.utilPct > 65 ? "#2563eb" : "#0ea5e9");
+      ctx.fillRect(x, y, barW, barH);
+
+      ctx.fillStyle = "#0f172a";
+      ctx.font = "bold 10px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(`${item.utilPct.toFixed(0)}%`, cx, y - 13);
+      ctx.font = "9.5px sans-serif";
+      ctx.fillStyle = "#475569";
+      ctx.fillText(`(${item.served})`, cx, y - 3);
+
+      ctx.fillStyle = "#334155";
+      ctx.font = "bold 10.5px sans-serif";
+      ctx.fillText(`#${idx + 1}`, cx, h - 9);
+    });
+
+    ctx.font = "11px sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#334155";
+    ctx.fillText("Barra: Utilización (%) · Entre paréntesis: consultas atendidas por conexión", pad.left + 6, 14);
+  }
+
+  // =========================================================================
+  // 5. MONITOR VISUAL EN TIEMPO REAL + CONSOLA DE LOG
+  // =========================================================================
+  let liveRunning = true;
+  let liveSim = null;
+
+  function resetLiveSim() {
+    const c = parseInt(document.getElementById("inPool").value, 10);
+    liveSim = {
+      t: 0,
+      seq: 1,
+      nextArr: 0.01,
+      queue: [],
+      slots: Array.from({ length: c }, (_, i) => ({ id: i + 1, req: null, rem: 0, tot: 1 })),
+      logs: []
+    };
+    const term = document.getElementById("terminalLog");
+    if (term) term.innerHTML = `<div class="log-ok">[0.000 s] Motor DES inicializado · Pool c=${c} conexiones</div>`;
+  }
+
+  function pushTerminal(msg, cls = "") {
+    if (!liveSim) return;
+    liveSim.logs.push(`<div class="${cls}">${msg}</div>`);
+    if (liveSim.logs.length > 22) liveSim.logs.shift();
+    const term = document.getElementById("terminalLog");
+    term.innerHTML = liveSim.logs.join("");
+    term.scrollTop = term.scrollHeight;
+  }
+
+  function toggleLive() {
+    liveRunning = !liveRunning;
+    document.getElementById("btnPauseLive").textContent = liveRunning ? "⏸ Pausar" : "▶ Reanudar";
+  }
+
+  function tickLive() {
+    if (!liveRunning || !liveSim) return;
+    const lambda = parseFloat(document.getElementById("inLambda").value);
+    const mediaSeg = parseFloat(document.getElementById("inSrv").value) / 1000.0;
+    const c = parseInt(document.getElementById("inPool").value, 10);
+    const kMax = parseInt(document.getElementById("inK").value, 10);
+    const slaSeg = parseFloat(document.getElementById("inSla").value) / 1000.0;
+
+    if (liveSim.slots.length !== c) resetLiveSim();
+
+    const dt = 0.012;
+    liveSim.t += dt;
+    liveSim.nextArr -= dt;
+
+    while (liveSim.nextArr <= 0) {
+      const reqId = `REQ-${String(liveSim.seq++).padStart(4, "0")}`;
+      const free = liveSim.slots.find(s => s.req === null);
+      const dur = Math.max(0.015, mediaSeg * (0.6 + Math.random() * 0.9));
+
+      if (free) {
+        free.req = reqId;
+        free.rem = dur;
+        free.tot = dur;
+        if (Math.random() < 0.35) {
+          pushTerminal(`[${liveSim.t.toFixed(3)} s] ${reqId} asignado directo a Conn #${free.id}`);
+        }
+      } else if (liveSim.queue.length < kMax) {
+        liveSim.queue.push({ id: reqId, tArr: liveSim.t });
+        if (Math.random() < 0.45) {
+          pushTerminal(`[${liveSim.t.toFixed(3)} s] ${reqId} encola FIFO (pos. ${liveSim.queue.length})`, "log-warn");
+        }
+      } else {
+        pushTerminal(`[${liveSim.t.toFixed(3)} s] ${reqId} RECHAZADO HTTP 503 (Cola llena K=${kMax})`, "log-err");
+      }
+      liveSim.nextArr += -Math.log(1 - Math.random()) / lambda;
+    }
+
+    let busyCnt = 0;
+    liveSim.slots.forEach(s => {
+      if (s.req !== null) {
+        s.rem -= dt;
+        if (s.rem <= 0) {
+          if (liveSim.queue.length > 0) {
+            const nxt = liveSim.queue.shift();
+            const espera = liveSim.t - nxt.tArr;
+            const dur = Math.max(0.015, mediaSeg * (0.6 + Math.random() * 0.9));
+            s.req = nxt.id;
+            s.rem = dur;
+            s.tot = dur;
+            busyCnt++;
+            if (Math.random() < 0.4) {
+              pushTerminal(`[${liveSim.t.toFixed(3)} s] ${nxt.id} → Conn #${s.id} (esperó ${(espera*1000).toFixed(1)} ms)`, "log-ok");
+            }
+          } else {
+            s.req = null;
+          }
+        } else {
+          busyCnt++;
+        }
+      }
+    });
+
+    document.getElementById("liveClock").textContent = liveSim.t.toFixed(2) + " s";
+    document.getElementById("liveQCount").textContent = `${liveSim.queue.length} / ${kMax}`;
+    document.getElementById("liveSlotCount").textContent = `${busyCnt} / ${c}`;
+
+    const well = document.getElementById("liveQueueWell");
+    if (liveSim.queue.length === 0) {
+      well.innerHTML = `<span style="font-size:0.75rem; color:#94a3b8;">Cola vacía — sin contención</span>`;
+    } else {
+      well.innerHTML = liveSim.queue.slice(0, 24).map(item => {
+        const risk = (liveSim.t - item.tArr) > (slaSeg * 0.5);
+        return `<span class="chip ${risk ? "sla-risk" : ""}">${item.id.replace("REQ-", "#")}</span>`;
+      }).join("") + (liveSim.queue.length > 24 ? `<span class="chip sla-risk">+${liveSim.queue.length - 24}</span>` : "");
+    }
+
+    const slotsEl = document.getElementById("livePoolSlots");
+    slotsEl.innerHTML = liveSim.slots.map(s => {
+      const pct = s.req ? Math.min(100, Math.max(8, ((s.tot - s.rem) / s.tot) * 100)) : 0;
+      return `
+        <div class="slot-card ${s.req ? "busy" : ""}">
+          <div class="slot-head">
+            <span>Conn #${s.id}</span>
+            <span style="font-family:monospace; color:${s.req ? "#1d4ed8" : "#94a3b8"}">${s.req ? s.req.replace("REQ-", "#") : "Libre"}</span>
+          </div>
+          <div class="bar-bg"><div class="bar-fg" style="width:${pct.toFixed(0)}%"></div></div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  // =========================================================================
+  // 6. ESCENARIOS, HISTORIAL ACUMULATIVO, 30 RÉPLICAS (IC 95 %) Y CSV
+  // =========================================================================
+  const ESCENARIOS_DEF = [
+    { id: "E0", nombre: "E0: Base (As-Is)", corto: "E0 Base", lambda: 60, c: 5, mediaMs: 50, kMax: 40 },
+    { id: "E1", nombre: "E1: Sobrecarga (As-Is)", corto: "E1 Carga", lambda: 92, c: 5, mediaMs: 50, kMax: 40 },
+    { id: "E2", nombre: "E2: Estrés Extremo", corto: "E2 Estrés", lambda: 115, c: 5, mediaMs: 50, kMax: 40 },
+    { id: "E3", nombre: "E3: Optimizado (To-Be)", corto: "E3 c=8", lambda: 92, c: 8, mediaMs: 50, kMax: 40 },
+    { id: "E4", nombre: "E4: Pico Extremo (To-Be)", corto: "E4 c=9", lambda: 115, c: 9, mediaMs: 50, kMax: 40 }
+  ];
+
+  let ultimaTablaExport = [];
+  let ultimoLogExport = [];
+  let historialCorridas = [];
+  let ultimaCorridaActual = null;
+  let etiquetaActiva = "E0: Base (As-Is)";
+
+  function leerParamsUI() {
+    return {
+      lambda: parseFloat(document.getElementById("inLambda").value),
+      c: parseInt(document.getElementById("inPool").value, 10),
+      mediaMs: parseFloat(document.getElementById("inSrv").value),
+      dist: document.getElementById("inDist").value,
+      kMax: parseInt(document.getElementById("inK").value, 10),
+      tSim: parseFloat(document.getElementById("inHorizonte").value),
+      slaMs: parseFloat(document.getElementById("inSla").value),
+      seed: parseInt(document.getElementById("inSeed").value, 10) || 42
+    };
+  }
+
+  function cargarEscenario(id, lambda, c, mediaMs, kMax) {
+    document.querySelectorAll(".btn-scen").forEach(b => b.classList.remove("active"));
+    const btn = document.getElementById("btn" + id);
+    if (btn) btn.classList.add("active");
+    const found = ESCENARIOS_DEF.find(e => e.id === id);
+    etiquetaActiva = found ? found.nombre : id;
+
+    document.getElementById("inLambda").value = lambda;
+    document.getElementById("inPool").value = c;
+    document.getElementById("inSrv").value = mediaMs;
+    document.getElementById("inK").value = kMax;
+    resetLiveSim();
+    actualizarTodo();
+  }
+
+  function onControlInput() {
+    document.querySelectorAll(".btn-scen").forEach(b => b.classList.remove("active"));
+    etiquetaActiva = "Personalizado";
+    resetLiveSim();
+    actualizarTodo();
+  }
+
+  function simularYRegistrar() {
+    actualizarTodo();
+    registrarEnHistorial();
+  }
+
+  function registrarEnHistorial() {
+    if (!ultimaCorridaActual) return;
+    const { params, res, etiqueta } = ultimaCorridaActual;
+    historialCorridas.push({
+      num: historialCorridas.length + 1,
+      etiqueta,
+      dist: params.dist,
+      lambda: params.lambda,
+      c: params.c,
+      mediaMs: params.mediaMs,
+      kMax: params.kMax,
+      seed: params.seed,
+      Wq_ms: res.Wq.toFixed(2),
+      W_ms: res.W.toFixed(2),
+      P95_ms: res.WP95.toFixed(1),
+      rho_pct: res.rho.toFixed(1),
+      Lq: res.Lq.toFixed(3),
+      L: res.L.toFixed(3),
+      rechazo_pct: res.rechazoPct.toFixed(2),
+      fuera_sla_pct: res.fueraSlaPct.toFixed(1),
+      costo_conx_s: res.costoConnSeg.toFixed(1)
+    });
+    renderTablaHistorial();
+  }
+
+  function limpiarHistorial() {
+    historialCorridas = [];
+    renderTablaHistorial();
+  }
+
+  function renderTablaHistorial() {
+    const tbody = document.getElementById("tbodyHistorial");
+    if (historialCorridas.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; color:var(--light-muted);">No hay corridas guardadas aún. Ajusta parámetros y pulsa «Simular y Guardar en Historial».</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = historialCorridas.map(h => `
+      <tr>
+        <td><strong>${h.num}</strong></td>
+        <td>${h.etiqueta} <span style="color:var(--light-muted); font-size:0.75rem;">(${h.dist})</span></td>
+        <td>${h.lambda}</td>
+        <td>${h.c}</td>
+        <td>${h.mediaMs}ms / K=${h.kMax}</td>
+        <td>${h.seed}</td>
+        <td><strong>${h.Wq_ms} ms</strong></td>
+        <td>${h.W_ms} ms</td>
+        <td>${h.P95_ms} ms</td>
+        <td>${h.rho_pct} %</td>
+        <td>${h.Lq} / ${h.L}</td>
+        <td>${h.rechazo_pct}% / ${h.fuera_sla_pct}%</td>
+        <td>${h.costo_conx_s}</td>
+      </tr>
+    `).join("");
+  }
+
+  function actualizarTodo() {
+    const p = leerParamsUI();
+    const mu = 1000.0 / p.mediaMs;
+
+    // Etiquetas de controles
+    document.getElementById("lblLambda").textContent = `${p.lambda} req/s`;
+    document.getElementById("hintInter").textContent = `${(1000.0 / p.lambda).toFixed(1)} ms`;
+    document.getElementById("lblPool").textContent = `${p.c} conx.`;
+    document.getElementById("hintCap").textContent = `${(p.c * mu).toFixed(1)} req/s`;
+    document.getElementById("lblSrv").textContent = `${p.mediaMs} ms`;
+    document.getElementById("hintMu").textContent = `${mu.toFixed(1)} req/s`;
+    document.getElementById("lblK").textContent = `${p.kMax}`;
+    document.getElementById("valKCap").textContent = `${p.kMax}`;
+    document.getElementById("lblSlaCard").textContent = `${p.slaMs}`;
+
+    const cvMap = { lognormal: "CV = 0.8", normal: "CV = 0.25", exponencial: "CV = 1.0", uniforme: "Acotada" };
+    document.getElementById("lblDistBadge").textContent = cvMap[p.dist] || "";
+
+    // Panel teórico
+    const erl = calcularErlangC(p.lambda, p.mediaMs, p.c);
+    const slaBase = probSlaIntrinseca(p.mediaMs, p.slaMs, p.dist);
+    document.getElementById("teoCarga").textContent = erl.a.toFixed(2);
+    document.getElementById("teoRho").textContent = `${(erl.rho * 100).toFixed(1)} %`;
+    document.getElementById("teoWqErlang").textContent = Number.isFinite(erl.wqMs) ? `${erl.wqMs.toFixed(2)} ms` : "∞ (Saturado)";
+    document.getElementById("teoSlaBase").textContent = `${slaBase.toFixed(2)} %`;
+    document.getElementById("teoCostoConn").textContent = `${(p.c * (p.tSim * 0.9)).toFixed(1)} conx·s`;
+
+    // Simulación principal
+    const res = simularCorrida(p);
+    ultimaCorridaActual = { params: p, res, etiqueta: etiquetaActiva };
+    ultimoLogExport = res.logMuestra;
+
+    // KPIs
+    document.getElementById("valWq").textContent = `${res.Wq.toFixed(2)} ms`;
+    document.getElementById("valWqP95").textContent = `${res.WqP95.toFixed(1)} ms`;
+    document.getElementById("valWqMax").textContent = `${res.WqMax.toFixed(1)} ms`;
+    document.getElementById("valW").textContent = `${res.W.toFixed(2)} ms`;
+    document.getElementById("valWP95").textContent = `${res.WP95.toFixed(1)} ms`;
+    document.getElementById("valRho").textContent = `${res.rho.toFixed(1)} %`;
+    document.getElementById("valThru").textContent = `${res.throughput.toFixed(1)} req/s`;
+    document.getElementById("valLq").textContent = `${res.Lq.toFixed(3)}`;
+    document.getElementById("valLqMax").textContent = `${res.LqMax}`;
+    document.getElementById("valL").textContent = `${res.L.toFixed(3)}`;
+    document.getElementById("valDone").textContent = `${res.atendidas.toLocaleString()}`;
+    document.getElementById("valRej").textContent = `${res.rechazoPct.toFixed(2)} %`;
+    document.getElementById("valOutSla").textContent = `${res.fueraSlaPct.toFixed(1)} %`;
+
+    // Semáforos
+    const cardRho = document.getElementById("cardRho");
+    const hdrBadge = document.getElementById("headerBadgeEstado");
+    cardRho.className = "kpi-card";
+    if (res.rho < 75 && res.rechazoPct === 0) {
+      cardRho.classList.add("ok");
+      hdrBadge.textContent = `Estado: Estable (ρ = ${res.rho.toFixed(1)}%)`;
+    } else if (res.rho < 90 && res.rechazoPct < 1) {
+      cardRho.classList.add("warn");
+      hdrBadge.textContent = `Estado: Carga Elevada (ρ = ${res.rho.toFixed(1)}%)`;
+    } else {
+      cardRho.classList.add("crit");
+      hdrBadge.textContent = `Estado: Saturado / Cuello de Botella (ρ = ${res.rho.toFixed(1)}%)`;
+    }
+
+    // Ley de Little
+    const errLittle = res.L > 0 ? Math.abs((res.L - res.L_little) / res.L) * 100.0 : 0;
+    document.getElementById("littleText").textContent =
+      `L medido = ${res.L.toFixed(3)} consultas vs. (λ_ef × W) = ${res.L_little.toFixed(3)} consultas`;
+    document.getElementById("littleDiff").textContent =
+      `Diferencia relativa: ${errLittle.toFixed(2)} % (${errLittle < 1 ? "Consistencia verificada" : "Revisar: diferencia > 1 %"})`;
+
+    // Gráficos (3 de v2 + 2 nuevos en v3)
+    renderGraficoCola(res, p.kMax);
+    renderGraficoSaturacion(p);
+    renderHistograma(res, p.slaMs);
+    renderGraficoConexiones(res);
+
+    // Evaluar 5 escenarios en 1 corrida (semilla actual)
+    const comparativa = ESCENARIOS_DEF.map(esc => ({
+      ...esc,
+      res: simularCorrida({ ...p, lambda: esc.lambda, c: esc.c, mediaMs: esc.mediaMs, kMax: esc.kMax })
+    }));
+    renderGraficoBarras(comparativa);
+
+    document.getElementById("tituloTablaExp").textContent =
+      `Resultados Comparativos de Escenarios (1 Corrida · Semilla ${p.seed} · Dist: ${p.dist})`;
+    document.getElementById("notaEstadistica").innerHTML =
+      `Mostrando resultados de 1 corrida determinista (semilla = ${p.seed}). Pulsa <strong>«Calcular 30 Réplicas con IC 95 %»</strong> para obtener estimaciones con intervalos de confianza de Student (t = 2.045, 29 g.l.).`;
+
+    ultimaTablaExport = comparativa.map(item => ({
+      escenario: item.nombre,
+      parametros: `lambda=${item.lambda}, c=${item.c}, K=${item.kMax}`,
+      Wq_ms: item.res.Wq.toFixed(2),
+      W_ms: item.res.W.toFixed(2),
+      P95_ms: item.res.WP95.toFixed(2),
+      rho_pct: item.res.rho.toFixed(2),
+      Lq: item.res.Lq.toFixed(3),
+      L_WIP: item.res.L.toFixed(3),
+      throughput: item.res.throughput.toFixed(2),
+      rechazo_pct: item.res.rechazoPct.toFixed(2),
+      fuera_sla_pct: item.res.fueraSlaPct.toFixed(2)
+    }));
+
+    document.getElementById("tbodyResultados").innerHTML = comparativa.map(item => {
+      const r = item.res;
+      return `
+        <tr>
+          <td><strong>${item.nombre}</strong></td>
+          <td>λ=${item.lambda}, c=${item.c}, K=${item.kMax}</td>
+          <td><strong>${r.Wq.toFixed(2)} ms</strong></td>
+          <td>${r.W.toFixed(2)} ms</td>
+          <td>${r.WP95.toFixed(1)} ms</td>
+          <td>${r.rho.toFixed(1)} %</td>
+          <td>${r.Lq.toFixed(3)}</td>
+          <td>${r.L.toFixed(3)}</td>
+          <td>${r.throughput.toFixed(2)} /s</td>
+          <td>${r.rechazoPct.toFixed(2)} %</td>
+          <td>${r.fueraSlaPct.toFixed(1)} %</td>
+        </tr>
+      `;
+    }).join("");
+
+    // Log de muestra
+    document.getElementById("tbodyLogMuestra").innerHTML = res.logMuestra.map(row => `
+      <tr>
+        <td style="font-family:monospace; font-weight:700;">${row.caseId}</td>
+        <td><span class="badge-tag" style="background:#eff6ff; color:#1d4ed8;">${row.conn}</span></td>
+        <td>${row.llegada.toFixed(4)} s</td>
+        <td>${row.inicio.toFixed(4)} s</td>
+        <td>${row.fin.toFixed(4)} s</td>
+        <td>${row.wqMs.toFixed(2)} ms</td>
+        <td><strong>${row.wMs.toFixed(2)} ms</strong></td>
+        <td><span class="badge-tag ${row.okSla ? "tag-ok" : "tag-crit"}">${row.okSla ? "Cumple SLA" : "Excede SLA"}</span></td>
+      </tr>
+    `).join("");
+  }
+
+  function ejecutar30Replicas() {
+    const p = leerParamsUI();
+    const R = 30;
+    const T_95 = 2.04523;
+
+    function statsIC(valores) {
+      const m = valores.reduce((a, b) => a + b, 0) / valores.length;
+      const variance = valores.reduce((acc, v) => acc + Math.pow(v - m, 2), 0) / (valores.length - 1);
+      const hw = T_95 * Math.sqrt(variance / valores.length);
+      return { m, hw };
+    }
+
+    const filas = ESCENARIOS_DEF.map(esc => {
+      const reps = [];
+      for (let r = 0; r < R; r++) {
+        reps.push(simularCorrida({
+          ...p,
+          lambda: esc.lambda,
+          c: esc.c,
+          mediaMs: esc.mediaMs,
+          kMax: esc.kMax,
+          seed: p.seed + r
+        }));
+      }
+      return {
+        esc,
+        Wq: statsIC(reps.map(x => x.Wq)),
+        W: statsIC(reps.map(x => x.W)),
+        WP95: statsIC(reps.map(x => x.WP95)),
+        rho: statsIC(reps.map(x => x.rho)),
+        Lq: statsIC(reps.map(x => x.Lq)),
+        L: statsIC(reps.map(x => x.L)),
+        thru: statsIC(reps.map(x => x.throughput)),
+        rej: statsIC(reps.map(x => x.rechazoPct)),
+        sla: statsIC(reps.map(x => x.fueraSlaPct))
+      };
+    });
+
+    document.getElementById("tituloTablaExp").textContent =
+      `Resultados de 30 Réplicas Independientes (Media ± Semiancho IC 95 % · Dist: ${p.dist})`;
+    document.getElementById("notaEstadistica").innerHTML =
+      `<strong>Inferencia estadística completada:</strong> 30 réplicas por escenario (semillas ${p.seed} a ${p.seed + 29}), T_sim = ${p.tSim} s (descartando 10 % warm-up), t_{0.975, 29} = 2.045.`;
+
+    ultimaTablaExport = filas.map(f => ({
+      escenario: f.esc.nombre,
+      parametros: `lambda=${f.esc.lambda}, c=${f.esc.c}, K=${f.esc.kMax}`,
+      Wq_ms_IC95: `${f.Wq.m.toFixed(2)} ± ${f.Wq.hw.toFixed(2)}`,
+      W_ms_IC95: `${f.W.m.toFixed(2)} ± ${f.W.hw.toFixed(2)}`,
+      P95_ms_IC95: `${f.WP95.m.toFixed(2)} ± ${f.WP95.hw.toFixed(2)}`,
+      rho_pct_IC95: `${f.rho.m.toFixed(2)} ± ${f.rho.hw.toFixed(2)}`,
+      Lq_IC95: `${f.Lq.m.toFixed(3)} ± ${f.Lq.hw.toFixed(3)}`,
+      L_WIP_IC95: `${f.L.m.toFixed(3)} ± ${f.L.hw.toFixed(3)}`,
+      throughput_IC95: `${f.thru.m.toFixed(2)} ± ${f.thru.hw.toFixed(2)}`,
+      rechazo_pct: `${f.rej.m.toFixed(2)} ± ${f.rej.hw.toFixed(2)}`,
+      fuera_sla_pct: `${f.sla.m.toFixed(2)} ± ${f.sla.hw.toFixed(2)}`
+    }));
+
+    document.getElementById("tbodyResultados").innerHTML = filas.map(f => `
+      <tr>
+        <td><strong>${f.esc.nombre}</strong></td>
+        <td>λ=${f.esc.lambda}, c=${f.esc.c}, K=${f.esc.kMax}</td>
+        <td><strong>${f.Wq.m.toFixed(2)} ± ${f.Wq.hw.toFixed(2)}</strong></td>
+        <td>${f.W.m.toFixed(2)} ± ${f.W.hw.toFixed(2)}</td>
+        <td>${f.WP95.m.toFixed(1)} ± ${f.WP95.hw.toFixed(1)}</td>
+        <td>${f.rho.m.toFixed(1)} ± ${f.rho.hw.toFixed(1)} %</td>
+        <td>${f.Lq.m.toFixed(3)} ± ${f.Lq.hw.toFixed(3)}</td>
+        <td>${f.L.m.toFixed(3)} ± ${f.L.hw.toFixed(3)}</td>
+        <td>${f.thru.m.toFixed(2)} ± ${f.thru.hw.toFixed(2)}</td>
+        <td>${f.rej.m.toFixed(2)} ± ${f.rej.hw.toFixed(2)} %</td>
+        <td>${f.sla.m.toFixed(1)} ± ${f.sla.hw.toFixed(1)} %</td>
+      </tr>
+    `).join("");
+  }
+
+  function descargarCSV(tipo) {
+    let rows = [];
+    let filename = "resultados_pool_bd.csv";
+    if (tipo === "escenarios") {
+      rows = ultimaTablaExport;
+      filename = "escenarios_pool_conexiones.csv";
+    } else if (tipo === "historial") {
+      rows = historialCorridas;
+      filename = "historial_corridas_pool_bd.csv";
+    } else {
+      rows = ultimoLogExport;
+      filename = "log_eventos_pool_conexiones.csv";
+    }
+    if (!rows || rows.length === 0) return;
+
+    const headers = Object.keys(rows[0]);
+    const csvLines = [
+      headers.join(","),
+      ...rows.map(r => headers.map(h => `"${String(r[h]).replace(/"/g, '""')}"`).join(","))
+    ];
+    const blob = new Blob([csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  window.addEventListener("load", () => {
+    resetLiveSim();
+    actualizarTodo();
+    registrarEnHistorial();
+    setInterval(tickLive, 55);
+  });
+
+  window.addEventListener("resize", () => {
+    actualizarTodo();
+  });
+</script>
+</body>
+</html>
