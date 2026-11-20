@@ -1,18 +1,6 @@
 !pip install simpy
-"""
-Simulación de Eventos Discretos (Modelo G/G/c/K) de un Pool de Conexiones a Base de Datos — Versión 3
-Implementación gemela en Python + SimPy sincronizada con index.html (v3) para GitHub Pages.
 
-Características:
-- Modela llegadas de Poisson (Exponencial), cola FIFO finita (K) con rechazos HTTP 503 y pool de c conexiones.
-- Soporta distribuciones de servicio: Lognormal (CV=0.8), Normal truncada, Exponencial y Uniforme.
-- Registra métricas por conexión individual (Conn #1 .. Conn #c), costo de reserva (conexión-segundos) y SLA.
-- Valida el motor contra la fórmula analítica Erlang C (M/M/c) y la Ley de Little (L = lambda_ef * W).
-- Ejecuta 30 réplicas independientes con Intervalo de Confianza al 95% (t de Student, 29 g.l.).
-
-Requisitos:
-    pip install simpy
-"""
+!pip install simpy matplotlib
 
 import math
 import random
@@ -93,6 +81,12 @@ def correr_replica(lam, c, media_s=0.050, k_max=40, dist="lognormal", t_sim=T_SI
     wq_list = []
     w_list = []
     log_eventos = []
+    serie_t = [0.0]
+    serie_q = [0]
+
+    def registrar_cola():
+        serie_t.append(env.now)
+        serie_q.append(estado["en_cola"])
 
     def acumular():
         ahora = env.now
@@ -131,6 +125,7 @@ def correr_replica(lam, c, media_s=0.050, k_max=40, dist="lognormal", t_sim=T_SI
 
         acumular()
         estado["en_cola"] += 1
+        registrar_cola()
         if en_ventana and estado["en_cola"] > estado["lq_max"]:
             estado["lq_max"] = estado["en_cola"]
 
@@ -139,6 +134,7 @@ def correr_replica(lam, c, media_s=0.050, k_max=40, dist="lognormal", t_sim=T_SI
             t_inicio = env.now
             acumular()
             estado["en_cola"] -= 1
+            registrar_cola()
             estado["en_srv"] += 1
 
             # Asignar la primera conexión física disponible
@@ -217,6 +213,9 @@ def correr_replica(lam, c, media_s=0.050, k_max=40, dist="lognormal", t_sim=T_SI
         "costo_conn_s": costo_conn_s,
         "per_conn": per_conn,
         "log": log_eventos,
+        "w_list": w_list,
+        "serie_t": serie_t,
+        "serie_q": serie_q,
     }
 
 
@@ -285,3 +284,138 @@ if __name__ == "__main__":
     r0 = correr_replica(lam=60.0, c=5, media_s=0.050, k_max=40, dist="lognormal", seed=SEMILLA_BASE)
     for cid, conn_name, t_ll, t_ini, t_fin, wq_ms, w_ms in r0["log"]:
         print(f" {cid} [{conn_name}] | Llegada={t_ll:7.4f}s | Inicio={t_ini:7.4f}s | Fin={t_fin:7.4f}s | Wq={wq_ms:6.2f}ms | W={w_ms:6.2f}ms")
+
+
+# ==============================================================================
+# 5. GRÁFICOS (equivalentes a los 5 gráficos del simulador web)
+# ==============================================================================
+def generar_graficos(carpeta="graficos"):
+    """Genera 5 figuras PNG con matplotlib, equivalentes a las del simulador HTML."""
+    import os
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    os.makedirs(carpeta, exist_ok=True)
+    AZUL, ROJO, VERDE, GRIS = "#2563eb", "#dc2626", "#16a34a", "#64748b"
+
+    # --- Gráfico 1: evolución de la cola Q(t) en E0, E1 y E2 ------------------
+    fig, ejes = plt.subplots(3, 1, figsize=(9, 7), sharex=True)
+    for ax, (nombre, lam, c, media_s, k_max) in zip(ejes, ESCENARIOS[:3]):
+        r = correr_replica(lam=lam, c=c, media_s=media_s, k_max=k_max, seed=SEMILLA_BASE)
+        ax.step(r["serie_t"], r["serie_q"], where="post", color=AZUL, linewidth=0.9)
+        ax.axhline(k_max, color=ROJO, linestyle="--", linewidth=1, label=f"K = {k_max}")
+        ax.axvspan(0, T_WARMUP, color="#e2e8f0", alpha=0.7, label="Warm-up")
+        ax.set_ylabel("Cola Q(t)")
+        ax.set_ylim(-1, k_max * 1.3)
+        ax.set_title(nombre, fontsize=10, loc="left")
+        ax.legend(loc="upper right", fontsize=8, ncol=2)
+        ax.grid(alpha=0.3)
+    ejes[-1].set_xlabel("Tiempo simulado (s)")
+    fig.suptitle("Evolución de la cola FIFO en el tiempo (semilla 42)")
+    fig.tight_layout()
+    fig.savefig(f"{carpeta}/1_evolucion_cola.png", dpi=150)
+    plt.close(fig)
+
+    # --- Gráfico 2: curva de saturación Wq vs ρ (c = 5) con Erlang C ----------
+    c_sat, media_s = 5, 0.050
+    lams = [20, 30, 40, 50, 60, 70, 80, 85, 90, 95]
+    rhos, wq_sim = [], []
+    for lam in lams:
+        reps = [correr_replica(lam=lam, c=c_sat, media_s=media_s, k_max=40, seed=SEMILLA_BASE + r)
+                for r in range(10)]
+        rhos.append(lam * media_s / c_sat * 100.0)
+        wq_sim.append(statistics.mean(x["Wq_ms"] for x in reps))
+    lam_fino = [x * 0.5 for x in range(20, 191)]
+    rho_teo = [l * media_s / c_sat * 100.0 for l in lam_fino]
+    wq_teo = [erlang_c_wq_ms(l, media_s, c_sat) for l in lam_fino]
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.plot(rho_teo, wq_teo, color=GRIS, linestyle="--", label="Erlang C (M/M/5, K=∞)")
+    ax.plot(rhos, wq_sim, "o-", color=AZUL, label="Simulado (lognormal, K=40, 10 réplicas)")
+    ax.set_ylim(0, 200)
+    ax.set_xlim(35, 100)
+    ax.set_xlabel("Utilización ρ (%)")
+    ax.set_ylabel("Wq (ms)")
+    ax.set_title("Curva de saturación del pool (c = 5)")
+    ax.legend()
+    ax.grid(alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(f"{carpeta}/2_curva_saturacion.png", dpi=150)
+    plt.close(fig)
+
+    # --- Gráfico 3: comparativa de escenarios (Wq y W con IC 95 %) -------------
+    nombres, wq_m, wq_h, w_m, w_h = [], [], [], [], []
+    for nombre, lam, c, media_s, k_max in ESCENARIOS:
+        reps = [correr_replica(lam=lam, c=c, media_s=media_s, k_max=k_max, seed=SEMILLA_BASE + r)
+                for r in range(REPLICAS)]
+        s = resumir_30_replicas(reps)
+        nombres.append(nombre.split(":")[0] + f"\n(c={c})")
+        wq_m.append(s["Wq_ms"][0]); wq_h.append(s["Wq_ms"][1])
+        w_m.append(s["W_ms"][0]); w_h.append(s["W_ms"][1])
+    xs = range(len(nombres))
+    fig, ax = plt.subplots(figsize=(9, 5))
+    ax.bar([x - 0.2 for x in xs], wq_m, 0.4, yerr=wq_h, capsize=3, color=AZUL, label="Wq (cola)")
+    ax.bar([x + 0.2 for x in xs], w_m, 0.4, yerr=w_h, capsize=3, color="#0ea5e9", label="W (total)")
+    ax.axhline(SLA_MS, color=ROJO, linestyle="--", linewidth=1.2, label=f"SLA = {SLA_MS:.0f} ms")
+    ax.set_xticks(list(xs))
+    ax.set_xticklabels(nombres)
+    ax.set_ylabel("Tiempo (ms)")
+    ax.set_title("Comparativa de escenarios (media ± IC 95 %, 30 réplicas)")
+    ax.legend()
+    ax.grid(axis="y", alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(f"{carpeta}/3_comparativa_escenarios.png", dpi=150)
+    plt.close(fig)
+
+    # --- Gráfico 4: histograma de W con línea de SLA (E1 y E3) -----------------
+    fig, ejes = plt.subplots(1, 2, figsize=(11, 4.5), sharey=False)
+    for ax, idx in zip(ejes, (1, 3)):
+        nombre, lam, c, media_s, k_max = ESCENARIOS[idx]
+        r = correr_replica(lam=lam, c=c, media_s=media_s, k_max=k_max, seed=SEMILLA_BASE)
+        tope = max(SLA_MS * 1.4, percentil(r["w_list"], 99) * 1.05, 80)
+        n_bins = 20
+        ancho = tope / n_bins
+        conteos = [0] * n_bins
+        for v in r["w_list"]:
+            conteos[min(n_bins - 1, int(v / ancho))] += 1
+        colores = [VERDE if (i + 0.5) * ancho <= SLA_MS else ROJO for i in range(n_bins)]
+        ax.bar([(i + 0.5) * ancho for i in range(n_bins)], conteos, ancho * 0.9, color=colores)
+        ax.axvline(SLA_MS, color="#0f172a", linestyle="--", linewidth=1.4, label=f"SLA = {SLA_MS:.0f} ms")
+        ax.set_title(nombre, fontsize=10)
+        ax.set_xlabel("Tiempo total W (ms)")
+        ax.set_ylabel("Consultas")
+        ax.legend()
+        ax.grid(axis="y", alpha=0.3)
+    fig.suptitle("Distribución de W y cumplimiento del SLA (verde = cumple, rojo = excede)")
+    fig.tight_layout()
+    fig.savefig(f"{carpeta}/4_histograma_sla.png", dpi=150)
+    plt.close(fig)
+
+    # --- Gráfico 5: utilización y consultas atendidas por conexión (E3) --------
+    _, lam, c, media_s, k_max = ESCENARIOS[3]
+    r = correr_replica(lam=lam, c=c, media_s=media_s, k_max=k_max, seed=SEMILLA_BASE)
+    etiquetas = [f"#{i + 1}" for i in range(c)]
+    utils = [p["util_pct"] for p in r["per_conn"]]
+    atend = [p["atendidas"] for p in r["per_conn"]]
+    colores = [ROJO if u > 85 else (AZUL if u > 65 else "#0ea5e9") for u in utils]
+    fig, ax = plt.subplots(figsize=(8, 5))
+    barras = ax.bar(etiquetas, utils, color=colores)
+    for b, u, a in zip(barras, utils, atend):
+        ax.text(b.get_x() + b.get_width() / 2, u + 1.5, f"{u:.0f}%\n({a})", ha="center", fontsize=8)
+    ax.set_ylim(0, 105)
+    ax.set_xlabel("Conexión")
+    ax.set_ylabel("Utilización (%)")
+    ax.set_title("Utilización por conexión en E3 (λ=92, c=8) · entre paréntesis: consultas atendidas")
+    ax.grid(axis="y", alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(f"{carpeta}/5_carga_por_conexion.png", dpi=150)
+    plt.close(fig)
+
+    print(f"\n--- GRÁFICOS GENERADOS EN ./{carpeta}/ (5 archivos PNG) ---")
+
+
+if __name__ == "__main__":
+    try:
+        generar_graficos()
+    except ImportError:
+        print("\n(Para generar los gráficos instala matplotlib: pip install matplotlib)")
